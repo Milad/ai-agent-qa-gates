@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["coverage/**", "node_modules/**", ".codegraph/**"],
+  "jsPlugins": [{ "name": "qa", "specifier": "./index.cjs" }],
+  "rules": {
+    "curly": ["error", "all"],
+    "no-nested-ternary": "error",
+    "qa/restricted-libs": [
+      "error",
+      {
+        "libraries": [
+          {
+            "name": "vitest",
+            "allowImporters": ["./vitest.config.ts"],
+            "message": "Vitest imports are restricted to configuration; tests use globals."
+          }
+        ]
+      }
+    ]
+  }
+}

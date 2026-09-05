@@ -1,0 +1,21 @@
+# Tools
+.codegraph
+.serena
+
+# 3rd-Party dependencies
+node_modules
+
+# Test coverage
+coverage
+
+# Build and package output
+dist
+*.tgz
+
+# Agents
+.codex
+.agents
+
+# IDE Configurations
+.idea
+.vscode

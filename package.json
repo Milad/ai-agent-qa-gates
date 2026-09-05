@@ -1,0 +1,112 @@
+{
+  "name": "ai-agent-qa-gates",
+  "version": "1.0.0",
+  "description": "Oxlint rules for enforcing strict codebase quality gates.",
+  "keywords": [
+    "architecture",
+    "lint",
+    "oxlint",
+    "quality-gates"
+  ],
+  "homepage": "https://github.com/Milad/ai-agent-qa-gates#readme",
+  "bugs": {
+    "url": "https://github.com/Milad/ai-agent-qa-gates/issues"
+  },
+  "license": "ISC",
+  "contributors": [
+    {
+      "name": "Milad Kawas Cale",
+      "email": "miladkaleh@gmail.com"
+    },
+    {
+      "name": "OpenAI Codex",
+      "url": "https://openai.com/codex/"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Milad/ai-agent-qa-gates.git"
+  },
+  "files": [
+    "index.cjs",
+    "index.d.cts",
+    "types.d.cts",
+    "rules"
+  ],
+  "type": "module",
+  "main": "./index.cjs",
+  "types": "./index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./index.d.cts",
+      "require": "./index.cjs",
+      "default": "./index.cjs"
+    },
+    "./types": {
+      "types": "./types.d.cts"
+    },
+    "./no-comments": {
+      "types": "./rules/no-comments.d.cts",
+      "require": "./rules/no-comments.cjs",
+      "default": "./rules/no-comments.cjs"
+    },
+    "./no-re-exports": {
+      "types": "./rules/no-re-exports.d.cts",
+      "require": "./rules/no-re-exports.cjs",
+      "default": "./rules/no-re-exports.cjs"
+    },
+    "./restricted-construction": {
+      "types": "./rules/restricted-construction.d.cts",
+      "require": "./rules/restricted-construction.cjs",
+      "default": "./rules/restricted-construction.cjs"
+    },
+    "./restricted-libs": {
+      "types": "./rules/restricted-libs.d.cts",
+      "require": "./rules/restricted-libs.cjs",
+      "default": "./rules/restricted-libs.cjs"
+    },
+    "./whitelist-imports": {
+      "types": "./rules/whitelist-imports.d.cts",
+      "require": "./rules/whitelist-imports.cjs",
+      "default": "./rules/whitelist-imports.cjs"
+    }
+  },
+  "scripts": {
+    "deadcode:check": "knip --production",
+    "duplicate:check": "jscpd --min-lines 6 --min-tokens 70 --reporters ai --exit-code 1 index.cjs rules",
+    "fmt": "oxfmt --write",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "coverage:report": "vitest run --coverage --coverage.reporter=html",
+    "release:check": "npm publish --dry-run",
+    "style:check": "oxfmt --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "type:check": "tsc --noEmit",
+    "validate": "npm run type:check && npm run lint && npm run deadcode:check && npm run test:coverage && npm run duplicate:check && npm run style:check",
+    "prepublishOnly": "npm run validate",
+    "preversion": "npm run validate",
+    "postversion": "git push --follow-tags"
+  },
+  "dependencies": {
+    "eslint-import-resolver-node": "^0.4.0",
+    "eslint-module-utils": "^2.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "jscpd": "^5.0.16",
+    "knip": "^6.31.0",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.76.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "oxlint": ">=1.76.0 <2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
