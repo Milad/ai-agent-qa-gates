@@ -90,6 +90,15 @@ ruleTester.run("no-re-exports", noReExportsPlugin.rules["no-re-exports"], {
 ruleTester.run("restricted-libs", restrictedLibsPlugin.rules["restricted-libs"], {
   valid: [
     {
+      code: 'import value from "blocked-lib/subpath";',
+      filename: path.join(process.cwd(), "webapp/src/components/nested/view.test.tsx"),
+      options: [
+        {
+          libraries: [{ allowImporters: ["./webapp/src/**/*.test.{ts,tsx}"], name: "blocked-lib" }],
+        },
+      ],
+    },
+    {
       code: 'import value from "blocked-lib";',
       filename: path.join(process.cwd(), "src", "allowed.ts"),
       options: [{ libraries: [{ allowImporters: ["./src"], name: "blocked-lib" }] }],
@@ -101,6 +110,16 @@ ruleTester.run("restricted-libs", restrictedLibsPlugin.rules["restricted-libs"],
     },
   ],
   invalid: [
+    {
+      code: 'const value = require("blocked-lib");',
+      errors: [{ message: /Importing "blocked-lib" is restricted/ }],
+      filename: path.join(process.cwd(), "src/components/view.tsx"),
+      options: [
+        {
+          libraries: [{ allowImporters: ["./src/**/*.test.{ts,tsx}"], name: "blocked-lib" }],
+        },
+      ],
+    },
     {
       code: 'import value from "blocked-lib/subpath";',
       errors: [{ message: /Importing "blocked-lib\/subpath" is restricted/ }],
@@ -131,6 +150,11 @@ ruleTester.run("whitelist-imports", whitelistImportsPlugin.rules["whitelist-impo
       filename: path.join(process.cwd(), "rules", "synthetic.ts"),
       options: [{ allow: [] }],
     },
+    {
+      code: 'import "../rules/no-comments.cjs";',
+      filename: path.join(process.cwd(), "test/synthetic.test.ts"),
+      options: [{ allow: [{ target: "./rules", importers: ["./test/**/*.test.{ts,tsx}"] }] }],
+    },
   ],
   invalid: [
     {
@@ -138,6 +162,12 @@ ruleTester.run("whitelist-imports", whitelistImportsPlugin.rules["whitelist-impo
       errors: [{ message: /Unexpected import/ }],
       filename: path.join(process.cwd(), "test", "synthetic.ts"),
       options: [{ allow: [] }],
+    },
+    {
+      code: 'import "../rules/no-comments.cjs";',
+      errors: [{ message: /Unexpected import/ }],
+      filename: path.join(process.cwd(), "test/synthetic.ts"),
+      options: [{ allow: [{ target: "./rules", importers: ["./test/**/*.test.{ts,tsx}"] }] }],
     },
   ],
 });
@@ -284,7 +314,34 @@ describe("whitelist-imports helpers", () => {
     ).toBe(false);
   });
 
-  it("classifies paths and rejects unsupported wildcard patterns", () => {
+  it.each([
+    ["./webapp/src/**/*.test.tsx", "webapp/src/app/view.test.tsx", true],
+    ["./webapp/src/**/*.test.ts", "webapp/src/components/shared/location/model.test.ts", true],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/model.test.ts", true],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/components/view.test.tsx", true],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/components/view.tsx", false],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/other/view.test.ts", false],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/.hidden.test.ts", false],
+    ["./webapp/src/file?.ts", "webapp/src/file1.ts", true],
+    ["./webapp/src/file[12].ts", "webapp/src/file2.ts", true],
+    ["./webapp/src/file.{ts,tsx}", "webapp/src/file.tsx", true],
+  ])("matches importer glob %s against %s: %s", (pattern, filename, expected) => {
+    const basePath = process.cwd();
+    const boundary = helpers.normalizeBoundaryEntry(basePath, {
+      importers: [pattern],
+      target: "./webapp/src/test-support",
+    });
+
+    expect(
+      helpers.matchesAllowEntry(
+        boundary,
+        path.join(basePath, filename),
+        path.join(basePath, "webapp/src/test-support/helper.ts"),
+      ),
+    ).toBe(expected);
+  });
+
+  it("classifies paths and rejects target glob patterns", () => {
     const basePath = process.cwd();
     expect(helpers.inferPathKind(process.cwd())).toBe("directory");
     expect(helpers.inferPathKind(path.join(process.cwd(), "LICENSE"))).toBe("file");
@@ -292,8 +349,8 @@ describe("whitelist-imports helpers", () => {
     expect(helpers.inferPathKind(path.join(basePath, "missing"))).toBe("directory");
     expect(() =>
       helpers.normalizeBoundaryEntry(basePath, {
-        importers: ["./src/**/file.ts"],
-        target: "./src/domain",
+        importers: ["*"],
+        target: "./src/**/domain",
       }),
     ).toThrow("Invalid filename pattern");
   });
@@ -451,11 +508,14 @@ describe("whitelist-imports helpers", () => {
     expect(visitModule).toBeTypeOf("function");
   });
 
-  it("allows explicitly configured importers", () => {
+  it.each([
+    ["src/application/use-case.ts", "src/domain/model.ts"],
+    ["src/domain/model.ts", "src/domain/nested/model.ts"],
+  ])("allows configured or same-boundary imports from %s to %s", (importerFile, importedFile) => {
     const basePath = process.cwd();
     const reports: Array<{ message: string }> = [];
     let visitModule: ((source: { value: string }) => void) | undefined;
-    const importer = path.join(basePath, "src/application/use-case.ts");
+    const importer = path.join(basePath, importerFile);
     const context = {
       options: [
         {
@@ -466,7 +526,7 @@ describe("whitelist-imports helpers", () => {
     };
     helpers.createRuleVisitor(context, {
       getPhysicalFilename: () => importer,
-      resolveModule: () => path.join(basePath, "src/domain/model.ts"),
+      resolveModule: () => path.join(basePath, importedFile),
       visitModules: (callback: (source: { value: string }) => void) => {
         visitModule = callback;
         return {};
@@ -474,6 +534,31 @@ describe("whitelist-imports helpers", () => {
     });
     visitModule?.({ value: "../domain/model.js" });
     expect(reports).toEqual([]);
+  });
+});
+
+describe("restricted-libs importer globs", () => {
+  it.each([
+    ["./webapp/src/**/*.test.ts", "webapp/src/model.test.ts", true],
+    ["./webapp/src/**/*.test.tsx", "webapp/src/components/view.test.tsx", true],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/components/nested/model.test.ts", true],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/src/components/view.tsx", false],
+    ["./webapp/src/**/*.test.{ts,tsx}", "webapp/other/view.test.ts", false],
+    ["./webapp/src/*.test.ts", "webapp/src/nested/model.test.ts", false],
+    ["./webapp/src/**/*.test.ts", "webapp/src/.hidden/model.test.ts", false],
+    ["./webapp/src/file?.ts", "webapp/src/file1.ts", true],
+    ["./webapp/src/file[12].ts", "webapp/src/file2.ts", true],
+    ["./webapp/src/file.{ts,tsx}", "webapp/src/file.tsx", true],
+    ["./webapp/src/model.ts", "webapp/src/model.ts", true],
+    ["./webapp/src", "webapp/src/nested/model.ts", true],
+    ["*", "outside/model.ts", true],
+  ])("matches %s against %s: %s", (pattern, filename, expected) => {
+    const basePath = process.cwd();
+    expect(
+      restrictedLibsPlugin.__test__.isAllowedImporter(path.join(basePath, filename), basePath, [
+        pattern,
+      ]),
+    ).toBe(expected);
   });
 });
 

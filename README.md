@@ -153,17 +153,26 @@ Oxlint invocation.
 Each `libraries` entry has:
 
 - `name`: a package name; its subpaths are included;
-- `allowImporters`: repository-relative files or recursive directories, or `"*"`;
+- `allowImporters`: paths relative to the current working directory, including files, recursive
+  directories, Node.js glob patterns, or `"*"` (any importer);
 - `message`: an optional custom diagnostic.
 
 The rule checks static imports, re-exports, dynamic imports with literal specifiers, and CommonJS
 `require` calls. Relative imports and packages not listed in `libraries` are ignored.
 
+Importer globs support patterns such as `./src/**/*.test.{ts,tsx}`, using the same matching
+semantics as `whitelist-imports` below, including exclusion of dotfiles and hidden directories
+unless explicitly matched.
+
 ### `qa/whitelist-imports`
 
 Each `allow` entry defines a protected `target` file or directory and the files or directories that
-may import it. Importer entries may also be `"*"` or a shallow filename pattern such as
-`./src/*.test.ts`. When targets overlap, the most specific target wins.
+may import it. Importer entries may also be `"*"` (any importer) or Node.js glob patterns such as
+`./src/*.test.ts`, `./src/**/*.test.ts`, or `./src/**/*.test.{ts,tsx}`. A single `*` matches within
+one directory; `**` matches across directories, and braces select alternatives. Glob matching
+uses `path.matchesGlob`; wildcard segments exclude dotfiles and hidden directories unless
+explicitly matched. Targets remain literal files or directories. When targets overlap, the
+most specific target wins.
 
 Same-directory imports and imports within the same configured boundary are allowed. Dependencies
 outside the discovered project root and dependencies under `node_modules` are ignored. Unresolved relative,

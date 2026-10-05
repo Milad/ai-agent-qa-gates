@@ -95,13 +95,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.3",
     "jscpd": "^5.0.16",
     "knip": "^6.31.0",
-    "oxfmt": "^0.65.0",
+    "oxfmt": "^0.71.0",
     "oxlint": "^1.76.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.3"
   },
   "peerDependencies": {
     "oxlint": ">=1.76.0 <2"

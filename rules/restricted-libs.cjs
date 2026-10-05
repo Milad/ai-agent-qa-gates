@@ -25,7 +25,12 @@ function isAllowedImporter(importerPath, basePath, allowImporters) {
     if (entry === "*") {
       return true;
     }
-    return isWithinPath(path.resolve(basePath, entry), importerPath);
+
+    const resolvedPath = path.resolve(basePath, entry);
+
+    return /[*?[\]{}]/.test(entry)
+      ? path.matchesGlob(importerPath, resolvedPath)
+      : isWithinPath(resolvedPath, importerPath);
   });
 }
 

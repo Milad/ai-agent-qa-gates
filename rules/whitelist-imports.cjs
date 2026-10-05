@@ -54,30 +54,19 @@ function inferPathKind(resolvedPath) {
   }
 }
 
-function normalizePathEntry(basePath, configuredPath, allowFilenamePattern) {
+function normalizePathEntry(basePath, configuredPath, allowGlob) {
   const resolvedPath = resolvePath(basePath, configuredPath);
-  if (!configuredPath.includes("*")) {
+  const isGlob = allowGlob ? /[*?[\]{}]/.test(configuredPath) : configuredPath.includes("*");
+
+  if (!isGlob) {
     return { kind: inferPathKind(resolvedPath), path: resolvedPath };
   }
 
-  const configuredDirectory = path.dirname(configuredPath);
-  const configuredFilename = path.basename(configuredPath);
-  const wildcardIndex = configuredFilename.indexOf("*");
-  if (
-    !allowFilenamePattern ||
-    configuredDirectory.includes("*") ||
-    wildcardIndex === -1 ||
-    wildcardIndex !== configuredFilename.lastIndexOf("*")
-  ) {
+  if (!allowGlob) {
     throw new Error(`Invalid filename pattern: ${configuredPath}`);
   }
 
-  return {
-    kind: "filenamePattern",
-    path: resolvePath(basePath, configuredDirectory),
-    prefix: configuredFilename.slice(0, wildcardIndex),
-    suffix: configuredFilename.slice(wildcardIndex + 1),
-  };
+  return { kind: "glob", path: resolvedPath };
 }
 
 function normalizeBoundaryEntry(basePath, entry) {
@@ -96,13 +85,8 @@ function matchesPathEntry(entry, candidatePath) {
   if (entry.kind === "directory") {
     return isWithinPath(entry.path, candidatePath);
   }
-  if (entry.kind === "filenamePattern") {
-    const candidateFilename = path.basename(candidatePath);
-    return (
-      path.dirname(candidatePath) === entry.path &&
-      candidateFilename.startsWith(entry.prefix) &&
-      candidateFilename.endsWith(entry.suffix)
-    );
+  if (entry.kind === "glob") {
+    return path.matchesGlob(candidatePath, entry.path);
   }
   return path.resolve(entry.path) === path.resolve(candidatePath);
 }
