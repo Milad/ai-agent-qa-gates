@@ -49,6 +49,7 @@ function normalizePathEntry(basePath, configuredPath, allowGlob) {
 
 function normalizeBoundaryEntry(basePath, entry) {
   return {
+    allowTypesOnly: entry.allowTypesOnly,
     message: entry.message,
     target: normalizePathEntry(basePath, entry.target, false),
     importers: entry.importers.map((importer) =>
@@ -106,6 +107,17 @@ function findMatchingTarget(allow, importedPath) {
     .sort((left, right) => right.target.path.length - left.target.path.length)[0];
 }
 
+function isTypeOnlyImport(declaration) {
+  return (
+    declaration.importKind === "type" ||
+    declaration.exportKind === "type" ||
+    (declaration.specifiers?.length > 0 &&
+      declaration.specifiers.every(
+        (specifier) => specifier.importKind === "type" || specifier.exportKind === "type",
+      ))
+  );
+}
+
 function createRuleVisitor(context, dependencies = {}) {
   const resolveModuleFn = dependencies.resolveModule ?? resolveModule;
   const visitModulesFn = dependencies.visitModules ?? visitModules;
@@ -121,7 +133,7 @@ function createRuleVisitor(context, dependencies = {}) {
     : [];
 
   return visitModulesFn(
-    (source) => {
+    (source, declaration) => {
       const resolvedImportPath = resolveModuleFn(source.value, context);
       if (typeof resolvedImportPath !== "string") {
         if (isProjectLocalImport(source.value, internalImportPrefixes)) {
@@ -140,6 +152,17 @@ function createRuleVisitor(context, dependencies = {}) {
 
       const importerBoundary = findMatchingTarget(allow, importerPath);
       const matchingTarget = findMatchingTarget(allow, importedPath);
+
+      if (matchingTarget?.allowTypesOnly && !isTypeOnlyImport(declaration)) {
+        context.report({
+          node: source,
+          message:
+            matchingTarget.message ?? `Only type imports are allowed from "${source.value}".`,
+        });
+
+        return;
+      }
+
       if (
         isSameDirectoryImport(importerPath, importedPath) ||
         (importerBoundary &&
@@ -185,6 +208,7 @@ module.exports = {
                   type: "object",
                   properties: {
                     target: { type: "string" },
+                    allowTypesOnly: { type: "boolean" },
                     importers: { type: "array", minItems: 0, items: { type: "string" } },
                     message: { type: "string" },
                   },

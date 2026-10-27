@@ -178,7 +178,18 @@ uses `path.matchesGlob`; wildcard segments exclude dotfiles and hidden directori
 explicitly matched. Targets remain literal files or directories. When targets overlap, the
 most specific target wins.
 
-Same-directory imports and imports within the same configured boundary are allowed. Dependencies
+Set `allowTypesOnly: true` on an `allow` entry to require explicit type-only imports or re-exports
+from its target, including same-directory and same-boundary imports. Both `import type { Model }`
+and `import { type Model }` are allowed; mixed type/value imports, side-effect imports, `require()`,
+and dynamic imports are rejected. The configured `importers` restriction still applies. Omitting
+`allowTypesOnly` or setting it to `false` preserves the default behavior. For example:
+
+```json
+{ "target": "./src/domain", "importers": ["./src/ui"], "allowTypesOnly": true }
+```
+
+Same-directory imports and imports within the same configured boundary are allowed unless
+`allowTypesOnly` restricts them. Dependencies
 outside the discovered project root and dependencies under `node_modules` are ignored. Unresolved relative,
 absolute, or `internalImportPrefixes` imports are reported because their boundary cannot be
 verified; unresolved external packages are ignored.

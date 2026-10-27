@@ -172,6 +172,84 @@ ruleTester.run("whitelist-imports", whitelistImportsPlugin.rules["whitelist-impo
   ],
 });
 
+ruleTester.run(
+  "whitelist-imports allowTypesOnly",
+  whitelistImportsPlugin.rules["whitelist-imports"],
+  {
+    valid: [
+      'import type Value from "../rules/no-comments.cjs";',
+      'import type * as Types from "../rules/no-comments.cjs";',
+      'import type { Value } from "../rules/no-comments.cjs";',
+      'import { type Value, type Other as Renamed } from "../rules/no-comments.cjs";',
+      'export type { Value } from "../rules/no-comments.cjs";',
+      'export type * from "../rules/no-comments.cjs";',
+      'export { type Value } from "../rules/no-comments.cjs";',
+    ]
+      .map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: true }] }],
+      }))
+      .concat([
+        {
+          code: 'import Value from "../rules/no-comments.cjs";',
+          filename: path.join(process.cwd(), "test/synthetic.ts"),
+          options: [
+            { allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: false }] },
+          ],
+        },
+      ]),
+    invalid: [
+      ...[
+        'import Value from "../rules/no-comments.cjs";',
+        'import * as Values from "../rules/no-comments.cjs";',
+        'import { type Value, other } from "../rules/no-comments.cjs";',
+        'import "../rules/no-comments.cjs";',
+        'import {} from "../rules/no-comments.cjs";',
+        'const value = require("../rules/no-comments.cjs");',
+        'const value = import("../rules/no-comments.cjs");',
+        'export { Value } from "../rules/no-comments.cjs";',
+        'export * from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: true }] }],
+        errors: [{ message: /Only type imports/ }],
+      })),
+      {
+        code: 'import "./no-comments.cjs";',
+        filename: path.join(process.cwd(), "rules/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers: ["*"], allowTypesOnly: true }] }],
+        errors: [{ message: /Only type imports/ }],
+      },
+      {
+        code: 'import "./rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "synthetic.ts"),
+        options: [{ allow: [{ target: ".", importers: ["*"], allowTypesOnly: true }] }],
+        errors: [{ message: /Only type imports/ }],
+      },
+      {
+        code: 'import type { Value } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers: [], allowTypesOnly: true }] }],
+        errors: [{ message: /Unexpected import/ }],
+      },
+      {
+        code: 'import Value from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: "./rules", importers: ["*"], allowTypesOnly: true, message: "Use types." },
+            ],
+          },
+        ],
+        errors: [{ message: "Use types." }],
+      },
+    ],
+  },
+);
+
 beforeEach(() => {
   restrictedConstructionPlugin.__test__.resetRepoCounts();
 });

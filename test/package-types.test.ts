@@ -28,6 +28,7 @@ const restrictedLibsOptions = {
 const whitelistImportsOptions = {
   allow: [
     {
+      allowTypesOnly: true,
       importers: ["./src/application"],
       message: "Use the application boundary.",
       target: "./src/domain",
