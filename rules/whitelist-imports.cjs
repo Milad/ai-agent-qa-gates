@@ -49,14 +49,19 @@ function normalizePathEntry(basePath, configuredPath, allowGlob) {
 
 function normalizeBoundaryEntry(basePath, entry) {
   return {
-    allowTypesOnly: entry.allowTypesOnly,
     message: entry.message,
     target: normalizePathEntry(basePath, entry.target, false),
-    importers: entry.importers.map((importer) =>
-      importer === "*"
-        ? { any: true }
-        : { any: false, ...normalizePathEntry(basePath, importer, true) },
-    ),
+    importers: entry.importers.map((configuredImporter) => {
+      const [importer, options] = Array.isArray(configuredImporter)
+        ? configuredImporter
+        : [configuredImporter, {}];
+      return {
+        allowTypesOnly: options.allowTypesOnly,
+        ...(importer === "*"
+          ? { any: true }
+          : { any: false, ...normalizePathEntry(basePath, importer, true) }),
+      };
+    }),
   };
 }
 
@@ -70,16 +75,15 @@ function matchesPathEntry(entry, candidatePath) {
   return path.resolve(entry.path) === path.resolve(candidatePath);
 }
 
+function matchesImporter(importer, importerPath) {
+  return importer.any || matchesPathEntry(importer, importerPath);
+}
+
 function matchesAllowEntry(allowEntry, importerPath, importedPath) {
   if (!matchesPathEntry(allowEntry.target, importedPath)) {
     return false;
   }
-  return allowEntry.importers.some((importer) => {
-    if (importer.any) {
-      return true;
-    }
-    return matchesPathEntry(importer, importerPath);
-  });
+  return allowEntry.importers.some((importer) => matchesImporter(importer, importerPath));
 }
 
 function isInternalImport(importerPath, importedPath) {
@@ -153,7 +157,15 @@ function createRuleVisitor(context, dependencies = {}) {
       const importerBoundary = findMatchingTarget(allow, importerPath);
       const matchingTarget = findMatchingTarget(allow, importedPath);
 
-      if (matchingTarget?.allowTypesOnly && !isTypeOnlyImport(declaration)) {
+      if (matchingTarget && matchesAllowEntry(matchingTarget, importerPath, importedPath)) {
+        if (
+          matchingTarget.importers.some(
+            (importer) => !importer.allowTypesOnly && matchesImporter(importer, importerPath),
+          ) ||
+          isTypeOnlyImport(declaration)
+        ) {
+          return;
+        }
         context.report({
           node: source,
           message:
@@ -169,9 +181,6 @@ function createRuleVisitor(context, dependencies = {}) {
           importerBoundary === matchingTarget &&
           isInternalImport(importerPath, importedPath))
       ) {
-        return;
-      }
-      if (matchingTarget && matchesAllowEntry(matchingTarget, importerPath, importedPath)) {
         return;
       }
 
@@ -208,8 +217,28 @@ module.exports = {
                   type: "object",
                   properties: {
                     target: { type: "string" },
-                    allowTypesOnly: { type: "boolean" },
-                    importers: { type: "array", minItems: 0, items: { type: "string" } },
+                    importers: {
+                      type: "array",
+                      minItems: 0,
+                      items: {
+                        oneOf: [
+                          { type: "string" },
+                          {
+                            type: "array",
+                            minItems: 2,
+                            maxItems: 2,
+                            items: [
+                              { type: "string" },
+                              {
+                                type: "object",
+                                properties: { allowTypesOnly: { type: "boolean" } },
+                                additionalProperties: false,
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
                     message: { type: "string" },
                   },
                   required: ["target", "importers"],

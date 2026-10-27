@@ -188,14 +188,16 @@ ruleTester.run(
       .map((code) => ({
         code,
         filename: path.join(process.cwd(), "test/synthetic.ts"),
-        options: [{ allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: true }] }],
+        options: [
+          { allow: [{ target: "./rules", importers: [["./test", { allowTypesOnly: true }]] }] },
+        ],
       }))
       .concat([
         {
           code: 'import Value from "../rules/no-comments.cjs";',
           filename: path.join(process.cwd(), "test/synthetic.ts"),
           options: [
-            { allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: false }] },
+            { allow: [{ target: "./rules", importers: [["./test", { allowTypesOnly: false }]] }] },
           ],
         },
       ]),
@@ -213,25 +215,29 @@ ruleTester.run(
       ].map((code) => ({
         code,
         filename: path.join(process.cwd(), "test/synthetic.ts"),
-        options: [{ allow: [{ target: "./rules", importers: ["./test"], allowTypesOnly: true }] }],
+        options: [
+          { allow: [{ target: "./rules", importers: [["./test", { allowTypesOnly: true }]] }] },
+        ],
         errors: [{ message: /Only type imports/ }],
       })),
       {
         code: 'import "./no-comments.cjs";',
         filename: path.join(process.cwd(), "rules/synthetic.ts"),
-        options: [{ allow: [{ target: "./rules", importers: ["*"], allowTypesOnly: true }] }],
+        options: [
+          { allow: [{ target: "./rules", importers: [["./rules", { allowTypesOnly: true }]] }] },
+        ],
         errors: [{ message: /Only type imports/ }],
       },
       {
         code: 'import "./rules/no-comments.cjs";',
         filename: path.join(process.cwd(), "synthetic.ts"),
-        options: [{ allow: [{ target: ".", importers: ["*"], allowTypesOnly: true }] }],
+        options: [{ allow: [{ target: ".", importers: [[".", { allowTypesOnly: true }]] }] }],
         errors: [{ message: /Only type imports/ }],
       },
       {
         code: 'import type { Value } from "../rules/no-comments.cjs";',
         filename: path.join(process.cwd(), "test/synthetic.ts"),
-        options: [{ allow: [{ target: "./rules", importers: [], allowTypesOnly: true }] }],
+        options: [{ allow: [{ target: "./rules", importers: [] }] }],
         errors: [{ message: /Unexpected import/ }],
       },
       {
@@ -240,11 +246,119 @@ ruleTester.run(
         options: [
           {
             allow: [
-              { target: "./rules", importers: ["*"], allowTypesOnly: true, message: "Use types." },
+              {
+                target: "./rules",
+                importers: [["./test", { allowTypesOnly: true }]],
+                message: "Use types.",
+              },
             ],
           },
         ],
         errors: [{ message: "Use types." }],
+      },
+    ],
+  },
+);
+
+ruleTester.run(
+  "whitelist-imports importer permissions",
+  whitelistImportsPlugin.rules["whitelist-imports"],
+  {
+    valid: [
+      ...[
+        ["./rules", ["./test", { allowTypesOnly: true }]],
+        [["./test", { allowTypesOnly: true }], "./rules"],
+      ].flatMap((importers) => [
+        {
+          code: 'import Value from "../index.cjs";',
+          filename: path.join(process.cwd(), "rules/service.ts"),
+          options: [{ allow: [{ target: "./index.cjs", importers }] }],
+        },
+        {
+          code: 'import type { Value } from "../index.cjs";',
+          filename: path.join(process.cwd(), "test/view.ts"),
+          options: [{ allow: [{ target: "./index.cjs", importers }] }],
+        },
+      ]),
+      ...[
+        ["*", ["./test", { allowTypesOnly: true }]],
+        [["./test", { allowTypesOnly: true }], "*"],
+        ["./test", ["./test/**/*.ts", { allowTypesOnly: true }]],
+        [["./test/**/*.ts", { allowTypesOnly: true }], "./test"],
+        [["./test", {}]],
+      ].map((importers) => ({
+        code: 'import Value from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers }] }],
+      })),
+      {
+        code: 'import type { Value } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: "./rules", importers: [["./test/**/*.ts", { allowTypesOnly: true }]] },
+            ],
+          },
+        ],
+      },
+      {
+        code: 'import "./no-comments.cjs";',
+        filename: path.join(process.cwd(), "rules/synthetic.ts"),
+        options: [
+          { allow: [{ target: "./rules", importers: [["./test", { allowTypesOnly: true }]] }] },
+        ],
+      },
+    ],
+    invalid: [
+      ...[
+        ["./rules", ["./test", { allowTypesOnly: true }]],
+        [["./test", { allowTypesOnly: true }], "./rules"],
+      ].map((importers) => ({
+        code: 'import Value from "../index.cjs";',
+        filename: path.join(process.cwd(), "test/view.ts"),
+        options: [{ allow: [{ target: "./index.cjs", importers }] }],
+        errors: [{ message: /Only type imports/ }],
+      })),
+      {
+        code: 'import type { Value } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/other.ts"),
+        options: [
+          {
+            allow: [
+              {
+                target: "./rules",
+                importers: ["./test/services", ["./test/ui", { allowTypesOnly: true }]],
+              },
+            ],
+          },
+        ],
+        errors: [{ message: /Unexpected import/ }],
+      },
+      {
+        code: 'import Value from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: "./rules", importers: [["./test/**/*.ts", { allowTypesOnly: true }]] },
+            ],
+          },
+        ],
+        errors: [{ message: /Only type imports/ }],
+      },
+      {
+        code: 'import Value from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: ".", importers: ["*"] },
+              { target: "./rules", importers: [["./test", { allowTypesOnly: true }]] },
+            ],
+          },
+        ],
+        errors: [{ message: /Only type imports/ }],
       },
     ],
   },
@@ -585,6 +699,42 @@ describe("whitelist-imports helpers", () => {
     visitModule?.({ value: "react" });
     expect(visitModule).toBeTypeOf("function");
   });
+
+  it.each([
+    [
+      undefined,
+      "src/model.ts",
+      `Unexpected import of "./dependency.js" from "${process.cwd()}" into "src/model.ts".`,
+    ],
+    [
+      "src/model.ts",
+      ".",
+      `Unexpected import of "./dependency.js" from "src/model.ts" into "${process.cwd()}".`,
+    ],
+  ])(
+    "reports root paths without empty diagnostic names: %s to %s",
+    (importerFile, importedFile, message) => {
+      const reports: Array<{ message: string }> = [];
+      let visitModule: ((source: { value: string }) => void) | undefined;
+      helpers.createRuleVisitor(
+        {
+          options: [{ allow: [] }],
+          report: (report: { message: string }) => reports.push(report),
+        },
+        {
+          getPhysicalFilename: () =>
+            importerFile === undefined ? undefined : path.join(process.cwd(), importerFile),
+          resolveModule: () => path.join(process.cwd(), importedFile),
+          visitModules: (callback: (source: { value: string }) => void) => {
+            visitModule = callback;
+            return {};
+          },
+        },
+      );
+      visitModule?.({ value: "./dependency.js" });
+      expect(reports.map((report) => report.message)).toEqual([message]);
+    },
+  );
 
   it.each([
     ["src/application/use-case.ts", "src/domain/model.ts"],
