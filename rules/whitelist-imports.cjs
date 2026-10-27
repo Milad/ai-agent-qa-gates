@@ -57,6 +57,7 @@ function normalizeBoundaryEntry(basePath, entry) {
         : [configuredImporter, {}];
       return {
         allowTypesOnly: options.allowTypesOnly,
+        allowSymbols: options.allowSymbols,
         ...(importer === "*"
           ? { any: true }
           : { any: false, ...normalizePathEntry(basePath, importer, true) }),
@@ -122,6 +123,34 @@ function isTypeOnlyImport(declaration) {
   );
 }
 
+function isAllowedByImporters(declaration, importers) {
+  if (
+    importers.some((importer) => !importer.allowTypesOnly && importer.allowSymbols === undefined) ||
+    (importers.some((importer) => importer.allowTypesOnly) && isTypeOnlyImport(declaration))
+  ) {
+    return true;
+  }
+  return (
+    declaration.specifiers?.length > 0 &&
+    declaration.specifiers.every((specifier) => {
+      let symbol;
+      if (specifier.type === "ImportDefaultSpecifier") {
+        symbol = "default";
+      } else if (specifier.type === "ImportSpecifier") {
+        symbol = specifier.imported.name ?? specifier.imported.value;
+      } else if (specifier.type === "ExportSpecifier") {
+        symbol = specifier.local.name ?? specifier.local.value;
+      }
+      return importers.some(
+        (importer) =>
+          (importer.allowTypesOnly &&
+            (specifier.importKind === "type" || specifier.exportKind === "type")) ||
+          importer.allowSymbols?.includes(symbol),
+      );
+    })
+  );
+}
+
 function createRuleVisitor(context, dependencies = {}) {
   const resolveModuleFn = dependencies.resolveModule ?? resolveModule;
   const visitModulesFn = dependencies.visitModules ?? visitModules;
@@ -158,18 +187,19 @@ function createRuleVisitor(context, dependencies = {}) {
       const matchingTarget = findMatchingTarget(allow, importedPath);
 
       if (matchingTarget && matchesAllowEntry(matchingTarget, importerPath, importedPath)) {
-        if (
-          matchingTarget.importers.some(
-            (importer) => !importer.allowTypesOnly && matchesImporter(importer, importerPath),
-          ) ||
-          isTypeOnlyImport(declaration)
-        ) {
+        const importers = matchingTarget.importers.filter((importer) =>
+          matchesImporter(importer, importerPath),
+        );
+        if (isAllowedByImporters(declaration, importers)) {
           return;
         }
         context.report({
           node: source,
           message:
-            matchingTarget.message ?? `Only type imports are allowed from "${source.value}".`,
+            matchingTarget.message ??
+            (importers.some((importer) => importer.allowSymbols !== undefined)
+              ? `Only configured symbols may be imported from "${source.value}".`
+              : `Only type imports are allowed from "${source.value}".`),
         });
 
         return;
@@ -231,7 +261,13 @@ module.exports = {
                               { type: "string" },
                               {
                                 type: "object",
-                                properties: { allowTypesOnly: { type: "boolean" } },
+                                properties: {
+                                  allowTypesOnly: { type: "boolean" },
+                                  allowSymbols: {
+                                    type: "array",
+                                    items: { type: "string", minLength: 1 },
+                                  },
+                                },
                                 additionalProperties: false,
                               },
                             ],

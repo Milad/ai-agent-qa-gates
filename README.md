@@ -106,18 +106,26 @@ Importers accept files, recursive directories, `"*"` (any importer), and Node.js
 Wildcard segments exclude hidden files and directories unless explicitly matched.
 
 Use `[path, { "allowTypesOnly": true }]` to restrict an importer to explicit type-only imports
-or re-exports. Plain strings and tuples with empty options or `allowTypesOnly: false` allow runtime values too:
+or re-exports. Plain strings and tuples without restrictions allow runtime values too:
 
 ```json
 {
   "target": "./src/domain",
-  "importers": ["./src/services", ["./src/ui", { "allowTypesOnly": true }]]
+  "importers": [
+    "./src/services",
+    ["./src/ui", { "allowTypesOnly": true, "allowSymbols": ["PortError"] }]
+  ]
 }
 ```
 
-This allows services to import types and runtime values; UI can import only types. Type-only
-syntax includes `import type { Model }` and `import { type Model }`. Mixed imports, side-effect
-imports, `require()`, and dynamic imports require runtime permission.
+This allows services unrestricted access; UI can import any types and the runtime `PortError`
+class. Type-only syntax includes `import type { Model }` and `import { type Model }`.
+
+`allowSymbols` whitelists exact exported names; aliases use the original name, and `"default"`
+permits default imports. Without `allowTypesOnly`, only listed symbols are allowed, including
+types. With it, all types are also allowed. Mixed imports must satisfy these permissions for
+every symbol. Namespace imports, side effects, `require()`, and dynamic imports need an
+unrestricted grant; type-only namespace imports remain allowed with `allowTypesOnly`.
 
 Permissions are additive and order-independent: any matching unrestricted importer permits
 runtime access. A plain `"*"` grants everyone runtime access. Other rules, including
@@ -126,8 +134,8 @@ runtime access. A plain `"*"` grants everyone runtime access. Other rules, inclu
 **Migration:** move target-level `allowTypesOnly` into importer tuples; the target-level option
 is no longer accepted.
 
-Same-directory and same-boundary imports are allowed unless matching tuples restrict them to
-types without a matching runtime grant. Dependencies outside the project root or under
+Explicit matching importer restrictions also apply within the same directory or boundary;
+otherwise those imports are allowed. Dependencies outside the project root or under
 `node_modules` are ignored. Unresolved local imports are reported; unresolved external packages
 are ignored. Set `internalImportPrefixes` (for example, `["@app/"]`) to treat aliases as local.
 

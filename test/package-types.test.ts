@@ -28,7 +28,10 @@ const restrictedLibsOptions = {
 const whitelistImportsOptions = {
   allow: [
     {
-      importers: ["./src/application", ["./src/ui", { allowTypesOnly: true }]],
+      importers: [
+        "./src/application",
+        ["./src/ui", { allowTypesOnly: true, allowSymbols: ["PortError"] }],
+      ],
       message: "Use the application boundary.",
       target: "./src/domain",
     },

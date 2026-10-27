@@ -364,6 +364,174 @@ ruleTester.run(
   },
 );
 
+ruleTester.run(
+  "whitelist-imports allowSymbols",
+  whitelistImportsPlugin.rules["whitelist-imports"],
+  {
+    valid: [
+      ...[
+        'import { PortError } from "../rules/no-comments.cjs";',
+        'import { PortError as LocalError } from "../rules/no-comments.cjs";',
+        'import { "PortError" as LocalError } from "../rules/no-comments.cjs";',
+        'import { type Port, PortError } from "../rules/no-comments.cjs";',
+        'import type * as Ports from "../rules/no-comments.cjs";',
+        'import type { Port } from "../rules/no-comments.cjs";',
+        'export { PortError as LocalError } from "../rules/no-comments.cjs";',
+        'export { "PortError" as LocalError } from "../rules/no-comments.cjs";',
+        'export { type Port, PortError } from "../rules/no-comments.cjs";',
+        'export type * from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              {
+                target: "./rules",
+                importers: [["./test", { allowTypesOnly: true, allowSymbols: ["PortError"] }]],
+              },
+            ],
+          },
+        ],
+      })),
+      ...[
+        'import { PortError } from "../rules/no-comments.cjs";',
+        'import type { PortError } from "../rules/no-comments.cjs";',
+        'export type { PortError } from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: "./rules", importers: [["./test", { allowSymbols: ["PortError"] }]] },
+            ],
+          },
+        ],
+      })),
+      ...[
+        'import ErrorClass from "../rules/no-comments.cjs";',
+        'import { default as ErrorClass } from "../rules/no-comments.cjs";',
+        'export { default as ErrorClass } from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [{ target: "./rules", importers: [["./test", { allowSymbols: ["default"] }]] }],
+          },
+        ],
+      })),
+      ...[
+        [
+          ["./test", { allowSymbols: ["PortError"] }],
+          ["./test", { allowSymbols: ["OtherError"] }],
+          ["./test", { allowTypesOnly: true }],
+        ],
+        [
+          ["./test", { allowTypesOnly: true }],
+          ["./test", { allowSymbols: ["OtherError"] }],
+          ["./test", { allowSymbols: ["PortError"] }],
+        ],
+      ].map((importers) => ({
+        code: 'import { type Port, PortError, OtherError } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers }] }],
+      })),
+      ...[
+        ["*", ["./test", { allowSymbols: ["PortError"] }]],
+        [["./test", { allowSymbols: ["PortError"] }], "*"],
+      ].map((importers) => ({
+        code: 'import * as Ports from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [{ allow: [{ target: "./rules", importers }] }],
+      })),
+    ],
+    invalid: [
+      ...[
+        'import { createPort } from "../rules/no-comments.cjs";',
+        'import { createPort as PortError } from "../rules/no-comments.cjs";',
+        'import { PortError, createPort } from "../rules/no-comments.cjs";',
+        'import * as Ports from "../rules/no-comments.cjs";',
+        'import ErrorClass from "../rules/no-comments.cjs";',
+        'import "../rules/no-comments.cjs";',
+        'import {} from "../rules/no-comments.cjs";',
+        'const { PortError } = require("../rules/no-comments.cjs");',
+        'const ports = import("../rules/no-comments.cjs");',
+        'export * from "../rules/no-comments.cjs";',
+        'export * as Ports from "../rules/no-comments.cjs";',
+        'export { createPort as PortError } from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              {
+                target: "./rules",
+                importers: [
+                  "./rules",
+                  ["./test", { allowTypesOnly: true, allowSymbols: ["PortError"] }],
+                ],
+              },
+            ],
+          },
+        ],
+        errors: [{ message: /Only configured symbols/ }],
+      })),
+      ...[
+        'import type { Port } from "../rules/no-comments.cjs";',
+        'export type { Port } from "../rules/no-comments.cjs";',
+        'import { PortErrorExtra } from "../rules/no-comments.cjs";',
+        'export { PortError, OtherError } from "../rules/no-comments.cjs";',
+        'import { PortError, type Port } from "../rules/no-comments.cjs";',
+      ].map((code) => ({
+        code,
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              { target: "./rules", importers: [["./test", { allowSymbols: ["PortError"] }]] },
+            ],
+          },
+        ],
+        errors: [{ message: /Only configured symbols/ }],
+      })),
+      {
+        code: 'import { PortError } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              {
+                target: "./rules",
+                importers: [["./test/other.ts", { allowSymbols: ["PortError"] }]],
+              },
+            ],
+          },
+        ],
+        errors: [{ message: /Unexpected import/ }],
+      },
+      {
+        code: 'import { PortError } from "../rules/no-comments.cjs";',
+        filename: path.join(process.cwd(), "test/synthetic.ts"),
+        options: [
+          {
+            allow: [
+              {
+                target: "./rules",
+                importers: [["./test", { allowSymbols: [] }]],
+                message: "Use port errors only.",
+              },
+            ],
+          },
+        ],
+        errors: [{ message: "Use port errors only." }],
+      },
+    ],
+  },
+);
+
 beforeEach(() => {
   restrictedConstructionPlugin.__test__.resetRepoCounts();
 });

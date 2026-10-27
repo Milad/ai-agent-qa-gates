@@ -35,7 +35,12 @@ export interface RestrictedLibsOptions {
   readonly libraries: readonly RestrictedLibrary[];
 }
 
-export type WhitelistImporter = string | readonly [string, { readonly allowTypesOnly?: boolean }];
+export type WhitelistImporter =
+  | string
+  | readonly [
+      string,
+      { readonly allowTypesOnly?: boolean; readonly allowSymbols?: readonly string[] },
+    ];
 
 export interface WhitelistImportBoundary {
   readonly target: string;
