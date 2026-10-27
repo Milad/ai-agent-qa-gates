@@ -98,7 +98,7 @@
     "@vitest/coverage-v8": "^5.0.3",
     "jscpd": "^5.0.16",
     "knip": "^6.31.0",
-    "oxfmt": "^0.71.0",
+    "oxfmt": "^0.74.0",
     "oxlint": "^1.76.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
