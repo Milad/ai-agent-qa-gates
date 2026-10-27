@@ -1,6 +1,6 @@
 {
   "name": "ai-agent-qa-gates",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Oxlint rules for enforcing strict codebase quality gates.",
   "keywords": [
     "architecture",
