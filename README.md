@@ -92,11 +92,15 @@ needs:
 }
 ```
 
-`restricted-libs` resolves relative importer paths from the current working directory, matching
-the convention used by similar import-restriction rules. `whitelist-imports` walks upward from each
-linted file to find the nearest Git root, including worktrees and submodules whose `.git` marker is
-a file. When no Git root exists, it uses the nearest `package.json`, then the current working
-directory as a final fallback.
+`restricted-libs` and `whitelist-imports` resolve configured paths from the same project root.
+Both walk upward from each linted file to find the nearest Git root, including worktrees and
+submodules whose `.git` marker is a file. When no Git root exists, they use the nearest
+`package.json`, then the current working directory as a final fallback.
+
+This makes root-level import policies consistent when linting from a workspace subdirectory,
+including tools that reuse the repository configuration while changing their working directory.
+When upgrading, policies previously written relative to a workspace directory must be updated to
+use paths relative to the Git root. Projects without Git still use the nearest package root.
 
 TypeScript projects use the same Oxlint configuration. The bundled declarations provide types when
 the aggregate plugin or an individual entry point is imported programmatically; configuration by
@@ -153,7 +157,7 @@ Oxlint invocation.
 Each `libraries` entry has:
 
 - `name`: a package name; its subpaths are included;
-- `allowImporters`: paths relative to the current working directory, including files, recursive
+- `allowImporters`: paths relative to the project root, including files, recursive
   directories, Node.js glob patterns, or `"*"` (any importer);
 - `message`: an optional custom diagnostic.
 

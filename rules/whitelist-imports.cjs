@@ -6,32 +6,10 @@ const { getPhysicalFilename } = require("eslint-module-utils/contextCompat");
 const moduleVisitor = require("eslint-module-utils/moduleVisitor");
 const resolveImport = require("eslint-module-utils/resolve");
 
+const { findProjectRoot } = require("./project-root.cjs");
+
 const visitModules = moduleVisitor.default;
 const resolveModule = resolveImport.default;
-
-function findProjectRoot(importerPath, existsSync = fs.existsSync) {
-  let currentDirectory = path.dirname(path.resolve(importerPath));
-  let nearestPackageRoot;
-
-  while (true) {
-    if (
-      nearestPackageRoot === undefined &&
-      existsSync(path.join(currentDirectory, "package.json"))
-    ) {
-      nearestPackageRoot = currentDirectory;
-    }
-
-    if (existsSync(path.join(currentDirectory, ".git"))) {
-      return currentDirectory;
-    }
-
-    const parentDirectory = path.dirname(currentDirectory);
-    if (parentDirectory === currentDirectory) {
-      return nearestPackageRoot ?? process.cwd();
-    }
-    currentDirectory = parentDirectory;
-  }
-}
 
 function isWithinPath(rootPath, candidatePath) {
   const relativePath = path.relative(rootPath, candidatePath);

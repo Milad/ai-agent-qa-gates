@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -55,6 +55,63 @@ afterEach(() => {
 });
 
 describe("published plugin", () => {
+  it.each(["directory", "file"])(
+    "resolves restricted libraries from the %s root in every working directory",
+    (marker) => {
+      const fixtureRoot = mkdtempSync(path.join(tmpdir(), "qa-restricted-root-"));
+      temporaryDirectories.push(fixtureRoot);
+      const workspace = path.join(fixtureRoot, "mobile");
+      const components = path.join(workspace, "src/components");
+      const services = path.join(workspace, "src/services");
+      mkdirSync(components, { recursive: true });
+      mkdirSync(services, { recursive: true });
+      if (marker === "directory") {
+        mkdirSync(path.join(fixtureRoot, ".git"));
+      } else {
+        writeFileSync(path.join(fixtureRoot, ".git"), "gitdir: /unused/worktree\n");
+      }
+      writeFileSync(path.join(workspace, "package.json"), "{}");
+      const allowedFile = path.join(components, "view.js");
+      const deniedFile = path.join(services, "service.js");
+      for (const filename of [allowedFile, deniedFile]) {
+        writeFileSync(filename, 'import value from "blocked-lib/subpath";\nvoid value;\n');
+      }
+      const configPath = path.join(fixtureRoot, "isolated.oxlintrc.json");
+      for (const allowedPath of ["./mobile/src/components", "./mobile/src/components/*.js"]) {
+        writeFileSync(
+          configPath,
+          JSON.stringify({
+            jsPlugins: [{ name: "qa", specifier: path.join(packageRoot, "index.cjs") }],
+            rules: {
+              "qa/restricted-libs": [
+                "error",
+                {
+                  libraries: [{ name: "blocked-lib", allowImporters: [allowedPath] }],
+                },
+              ],
+            },
+          }),
+        );
+        for (const cwd of [fixtureRoot, workspace]) {
+          const lint = (filename: string) =>
+            spawnSync(
+              oxlint,
+              ["--config", configPath, "--disable-nested-config", "--format", "json", filename],
+              { cwd, encoding: "utf8", stdio: "pipe" },
+            );
+          const allowed = lint(allowedFile);
+          expect(JSON.parse(allowed.stdout).diagnostics).toEqual([]);
+          expect(allowed.status).toBe(0);
+          const denied = lint(deniedFile);
+          expect(JSON.parse(denied.stdout).diagnostics).toEqual([
+            expect.objectContaining({ code: "qa(restricted-libs)" }),
+          ]);
+          expect(denied.status).toBe(1);
+        }
+      }
+    },
+  );
+
   it("loads all five rules using only an explicit fixture configuration", () => {
     const { configPath, fixtureRoot } = createFixture();
     let diagnostics = "";

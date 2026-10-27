@@ -4,6 +4,8 @@ const path = require("node:path");
 
 const visitModules = require("eslint-module-utils/moduleVisitor").default;
 
+const { findProjectRoot } = require("./project-root.cjs");
+
 function isWithinPath(rootPath, candidatePath) {
   const relativePath = path.relative(rootPath, candidatePath);
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
@@ -13,9 +15,9 @@ function matchesLibrary(source, library) {
   return source === library || source.startsWith(`${library}/`);
 }
 
-function normalizeConfig(options) {
+function normalizeConfig(options, basePath = process.cwd()) {
   return {
-    basePath: process.cwd(),
+    basePath,
     libraries: Array.isArray(options.libraries) ? options.libraries : [],
   };
 }
@@ -63,8 +65,8 @@ module.exports = {
         ],
       },
       create(context) {
-        const options = normalizeConfig(context.options[0] ?? {});
         const importerPath = path.resolve(context.getFilename?.() ?? "");
+        const options = normalizeConfig(context.options[0] ?? {}, findProjectRoot(importerPath));
 
         return visitModules(
           (source) => {
